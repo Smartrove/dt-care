@@ -53,23 +53,35 @@ const LoginScreen: React.FC = () => {
     setLoading(true);
 
     try {
-      // TODO: Replace with your actual API call
-      // const response = await fetch('YOUR_API_URL/auth/login', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ email, password }),
-      // });
-      // const data = await response.json();
+      // API call to your NestJS backend
+      const response = await fetch("YOUR_API_URL/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const data = await response.json();
 
-      // On success, navigate to home
-      router.replace("/");
-    } catch (error) {
+      if (!response.ok) {
+        throw new Error(data.message || "Invalid email or password");
+      }
+
+      // Store tokens (implement your auth storage)
+      // await AsyncStorage.setItem("accessToken", data.accessToken);
+      // await AsyncStorage.setItem("refreshToken", data.refreshToken);
+
+      // Navigate based on user role
+      if (data.user.role === "DENTIST") {
+        router.replace("/(dashboard)/(tabs)");
+      } else {
+        router.replace("/(dashboard)/(tabs)");
+      }
+    } catch (error: any) {
       Alert.alert(
         "Login Failed",
-        "Invalid email or password. Please try again.",
+        error.message || "Invalid email or password. Please try again.",
       );
     } finally {
       setLoading(false);
@@ -90,15 +102,13 @@ const LoginScreen: React.FC = () => {
         <View className="flex-1 px-6 pt-16">
           {/* Header */}
           <View className="mb-10">
-            <View className="w-16 h-16 bg-blue-600 rounded-2xl items-center justify-center mb-4">
-              <Text
-                className="text-white text-3xl font-bold"
-                onPress={() => router.push("/")}
-              >
-                🦷
-              </Text>
-            </View>
-            <Text className="text-4xl font-extrabold text-gray-900 mb-2">
+            <TouchableOpacity
+              onPress={() => router.push("/")}
+              className="w-14 h-14 bg-[#0a7ea4] rounded-2xl items-center justify-center mb-4"
+            >
+              <Text className="text-white text-3xl font-bold">🦷</Text>
+            </TouchableOpacity>
+            <Text className="text-3xl font-extrabold text-gray-900 mb-2">
               Welcome Back
             </Text>
             <Text className="text-base text-gray-600">
@@ -168,7 +178,7 @@ const LoginScreen: React.FC = () => {
                   onPress={() => setShowPassword(!showPassword)}
                   activeOpacity={0.7}
                 >
-                  <Text className="text-blue-600 text-sm font-semibold">
+                  <Text className="text-[#0a7ea4] text-sm font-semibold">
                     {showPassword ? "Hide" : "Show"}
                   </Text>
                 </TouchableOpacity>
@@ -182,11 +192,13 @@ const LoginScreen: React.FC = () => {
 
             {/* Forgot Password */}
             <TouchableOpacity
-              onPress={() => router.push("/forgot-password")}
+              onPress={() =>
+                router.push({ pathname: "/forgot-password", params: { email } })
+              }
               activeOpacity={0.7}
               className="self-end"
             >
-              <Text className="text-blue-600 text-sm font-semibold">
+              <Text className="text-[#0a7ea4] text-sm font-semibold">
                 Forgot Password?
               </Text>
             </TouchableOpacity>
@@ -197,7 +209,7 @@ const LoginScreen: React.FC = () => {
             onPress={handleLogin}
             disabled={loading}
             activeOpacity={0.8}
-            className={`bg-blue-600 py-4 rounded-xl items-center shadow-lg mb-6 ${
+            className={`bg-[#0a7ea4] py-4 rounded-xl items-center shadow-lg mb-6 ${
               loading ? "opacity-70" : ""
             }`}
           >
@@ -247,7 +259,7 @@ const LoginScreen: React.FC = () => {
               onPress={() => router.push("/signup")}
               activeOpacity={0.7}
             >
-              <Text className="text-blue-600 text-sm font-bold">Sign Up</Text>
+              <Text className="text-[#0a7ea4] text-sm font-bold">Sign Up</Text>
             </TouchableOpacity>
           </View>
 
@@ -255,11 +267,11 @@ const LoginScreen: React.FC = () => {
           <View className="items-center pb-6">
             <Text className="text-gray-500 text-xs text-center leading-5">
               By continuing, you agree to our{" "}
-              <Text className="text-blue-600 font-semibold">
+              <Text className="text-[#0a7ea4] font-semibold">
                 Terms of Service
               </Text>{" "}
               and{" "}
-              <Text className="text-blue-600 font-semibold">
+              <Text className="text-[#0a7ea4] font-semibold">
                 Privacy Policy
               </Text>
             </Text>

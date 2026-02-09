@@ -1,5 +1,5 @@
 // RegisterScreen.tsx
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -14,7 +14,10 @@ import {
   View,
 } from "react-native";
 
+type UserRole = "PATIENT" | "DENTIST";
+
 interface FormData {
+  // Common fields
   firstName: string;
   lastName: string;
   email: string;
@@ -23,6 +26,10 @@ interface FormData {
   confirmPassword: string;
   gender: "MALE" | "FEMALE" | "OTHER" | "";
   dateOfBirth: string;
+  // Dentist-specific fields
+  mdcnLicenseNumber: string;
+  yearsOfExperience: string;
+  bio: string;
 }
 
 interface FormErrors {
@@ -34,14 +41,36 @@ interface FormErrors {
   confirmPassword?: string;
   gender?: string;
   dateOfBirth?: string;
+  mdcnLicenseNumber?: string;
+  yearsOfExperience?: string;
+  role?: string;
 }
+
+const DENTIST_SPECIALIZATIONS = [
+  "GENERAL_DENTISTRY",
+  "ORTHODONTICS",
+  "PERIODONTICS",
+  "ENDODONTICS",
+  "PROSTHODONTICS",
+  "ORAL_SURGERY",
+  "PEDIATRIC_DENTISTRY",
+  "COSMETIC_DENTISTRY",
+  "IMPLANTOLOGY",
+  "ORAL_PATHOLOGY",
+];
 
 const RegisterScreen: React.FC = () => {
   const router = useRouter();
+  const params = useLocalSearchParams();
+
   const [currentStep, setCurrentStep] = useState(1);
+  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [selectedSpecializations, setSelectedSpecializations] = useState<
+    string[]
+  >([]);
 
   const [formData, setFormData] = useState<FormData>({
     firstName: "",
@@ -52,14 +81,16 @@ const RegisterScreen: React.FC = () => {
     confirmPassword: "",
     gender: "",
     dateOfBirth: "",
+    mdcnLicenseNumber: "",
+    yearsOfExperience: "",
+    bio: "",
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
 
   const updateFormData = (field: keyof FormData, value: string) => {
     setFormData({ ...formData, [field]: value });
-    // Clear error when user starts typing
-    if (errors[field]) {
+    if (errors[field as keyof FormErrors]) {
       setErrors({ ...errors, [field]: undefined });
     }
   };
@@ -87,6 +118,10 @@ const RegisterScreen: React.FC = () => {
       !/^(\+234|0)[789]\d{9}$/.test(formData.phoneNumber.replace(/\s/g, ""))
     ) {
       newErrors.phoneNumber = "Please enter a valid Nigerian phone number";
+    }
+
+    if (!selectedRole) {
+      newErrors.role = "Please select your account type";
     }
 
     setErrors(newErrors);
@@ -123,39 +158,88 @@ const RegisterScreen: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const validateDentistStep = (): boolean => {
+    const newErrors: FormErrors = {};
+
+    if (!formData.mdcnLicenseNumber.trim()) {
+      newErrors.mdcnLicenseNumber = "MDCN license number is required";
+    }
+
+    if (!formData.yearsOfExperience) {
+      newErrors.yearsOfExperience = "Years of experience is required";
+    } else if (parseInt(formData.yearsOfExperience) < 0) {
+      newErrors.yearsOfExperience = "Please enter a valid number";
+    }
+
+    if (selectedSpecializations.length === 0) {
+      newErrors.role = "Please select at least one specialization";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleNext = () => {
     if (currentStep === 1 && validateStep1()) {
       setCurrentStep(2);
+    } else if (currentStep === 2 && selectedRole === "DENTIST") {
+      if (validateStep2()) {
+        setCurrentStep(3);
+      }
+    } else if (currentStep === 2 && selectedRole === "PATIENT") {
+      if (validateStep2()) {
+        handleRegister();
+      }
+    }
+  };
+
+  const handleDentistRegister = () => {
+    if (validateDentistStep()) {
+      handleRegister();
     }
   };
 
   const handleBack = () => {
-    setCurrentStep(1);
+    if (currentStep === 3) {
+      setCurrentStep(2);
+    } else {
+      router.back();
+    }
   };
 
   const handleRegister = async () => {
-    if (!validateStep2()) {
-      return;
-    }
-
     setLoading(true);
 
     try {
+      const endpoint =
+        selectedRole === "DENTIST"
+          ? "auth/register/dentist"
+          : "auth/register/patient";
+
+      const payload: any = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phoneNumber: formData.phoneNumber,
+        password: formData.password,
+        gender: formData.gender,
+        dateOfBirth: formData.dateOfBirth,
+      };
+
+      if (selectedRole === "DENTIST") {
+        payload.mdcnLicenseNumber = formData.mdcnLicenseNumber;
+        payload.yearsOfExperience = parseInt(formData.yearsOfExperience);
+        payload.specializations = selectedSpecializations;
+        payload.bio = formData.bio;
+      }
+
       // API call to your NestJS backend
-      const response = await fetch("YOUR_API_URL/auth/register/patient", {
+      const response = await fetch(`YOUR_API_URL/${endpoint}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          phoneNumber: formData.phoneNumber,
-          password: formData.password,
-          gender: formData.gender,
-          dateOfBirth: formData.dateOfBirth,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -164,7 +248,6 @@ const RegisterScreen: React.FC = () => {
         throw new Error(data.message || "Registration failed");
       }
 
-      // Navigate to OTP verification screen
       router.push({
         pathname: "/verify-otp",
         params: { userId: data.userId, email: formData.email },
@@ -184,8 +267,77 @@ const RegisterScreen: React.FC = () => {
     }
   };
 
+  const renderStepIndicator = () => {
+    const totalSteps = selectedRole === "DENTIST" ? 3 : 2;
+    return (
+      <View className="flex-row justify-center mb-6">
+        {[1, 2, 3].map((step) => (
+          <View key={step} className="items-center mx-1">
+            <View
+              className={`w-8 h-8 rounded-full items-center justify-center ${
+                currentStep >= step ? "bg-[#0a7ea4]" : "bg-gray-200"
+              }`}
+            >
+              <Text
+                className={`text-sm font-bold ${
+                  currentStep >= step ? "text-white" : "text-gray-500"
+                }`}
+              >
+                {step}
+              </Text>
+            </View>
+            {step < totalSteps && (
+              <View
+                className={`w-8 h-0.5 mt-[-16px] ${
+                  currentStep > step ? "bg-[#0a7ea4]" : "bg-gray-200"
+                }`}
+              />
+            )}
+          </View>
+        ))}
+      </View>
+    );
+  };
+
   const renderStep1 = () => (
     <View>
+      {/* Role Selection */}
+      <View className="mb-6">
+        <Text className="text-sm font-semibold text-gray-700 mb-2">
+          I am a <Text className="text-red-500">*</Text>
+        </Text>
+        <View className="flex-row gap-3">
+          {[
+            { role: "PATIENT", label: "Patient", icon: "🏥" },
+            { role: "DENTIST", label: "Dentist", icon: "👨‍⚕️" },
+          ].map((option) => (
+            <TouchableOpacity
+              key={option.role}
+              onPress={() => setSelectedRole(option.role as UserRole)}
+              className={`flex-1 py-4 rounded-xl border-2 items-center ${
+                selectedRole === option.role
+                  ? "border-[#0a7ea4] bg-[#0a7ea4]/10"
+                  : "border-gray-200"
+              }`}
+            >
+              <Text className="text-2xl mb-1">{option.icon}</Text>
+              <Text
+                className={`text-sm font-semibold ${
+                  selectedRole === option.role
+                    ? "text-[#0a7ea4]"
+                    : "text-gray-700"
+                }`}
+              >
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {errors.role && (
+          <Text className="text-red-500 text-xs mt-1 ml-1">{errors.role}</Text>
+        )}
+      </View>
+
       {/* First Name */}
       <View className="mb-4">
         <Text className="text-sm font-semibold text-gray-700 mb-2">
@@ -293,11 +445,11 @@ const RegisterScreen: React.FC = () => {
         </Text>
       </View>
 
-      {/* Next Button */}
+      {/* Continue Button */}
       <TouchableOpacity
         onPress={handleNext}
         activeOpacity={0.8}
-        className="bg-blue-600 py-4 rounded-xl items-center shadow-lg mb-4"
+        className="bg-[#0a7ea4] py-4 rounded-xl items-center shadow-lg mb-4"
       >
         <Text className="text-white text-base font-bold">Continue</Text>
       </TouchableOpacity>
@@ -327,7 +479,7 @@ const RegisterScreen: React.FC = () => {
             autoCorrect={false}
           />
           <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-            <Text className="text-blue-600 text-sm font-semibold">
+            <Text className="text-[#0a7ea4] text-sm font-semibold">
               {showPassword ? "Hide" : "Show"}
             </Text>
           </TouchableOpacity>
@@ -365,7 +517,7 @@ const RegisterScreen: React.FC = () => {
           <TouchableOpacity
             onPress={() => setShowConfirmPassword(!showConfirmPassword)}
           >
-            <Text className="text-blue-600 text-sm font-semibold">
+            <Text className="text-[#0a7ea4] text-sm font-semibold">
               {showConfirmPassword ? "Hide" : "Show"}
             </Text>
           </TouchableOpacity>
@@ -389,13 +541,15 @@ const RegisterScreen: React.FC = () => {
               onPress={() => updateFormData("gender", gender)}
               className={`flex-1 py-3 rounded-xl border-2 items-center ${
                 formData.gender === gender
-                  ? "bg-blue-50 border-blue-600"
+                  ? "border-[#0a7ea4] bg-[#0a7ea4]/10"
                   : "border-gray-200"
               }`}
             >
               <Text
                 className={`text-sm font-semibold ${
-                  formData.gender === gender ? "text-blue-600" : "text-gray-700"
+                  formData.gender === gender
+                    ? "text-[#0a7ea4]"
+                    : "text-gray-700"
                 }`}
               >
                 {gender.charAt(0) + gender.slice(1).toLowerCase()}
@@ -442,10 +596,164 @@ const RegisterScreen: React.FC = () => {
       {/* Action Buttons */}
       <View className="gap-3">
         <TouchableOpacity
-          onPress={handleRegister}
+          onPress={handleNext}
           disabled={loading}
           activeOpacity={0.8}
-          className={`bg-blue-600 py-4 rounded-xl items-center shadow-lg ${
+          className={`bg-[#0a7ea4] py-4 rounded-xl items-center shadow-lg ${
+            loading ? "opacity-70" : ""
+          }`}
+        >
+          {loading ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : selectedRole === "DENTIST" ? (
+            <Text className="text-white text-base font-bold">Continue</Text>
+          ) : (
+            <Text className="text-white text-base font-bold">
+              Create Account
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={handleBack}
+          disabled={loading}
+          activeOpacity={0.8}
+          className="border-2 border-gray-200 py-4 rounded-xl items-center"
+        >
+          <Text className="text-gray-700 text-base font-bold">Back</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderDentistStep = () => (
+    <View>
+      {/* MDCN License */}
+      <View className="mb-4">
+        <Text className="text-sm font-semibold text-gray-700 mb-2">
+          MDCN License Number <Text className="text-red-500">*</Text>
+        </Text>
+        <View
+          className={`border-2 rounded-xl px-4 py-3 ${
+            errors.mdcnLicenseNumber ? "border-red-500" : "border-gray-200"
+          }`}
+        >
+          <TextInput
+            className="text-base text-gray-900"
+            placeholder="Enter your MDCN license number"
+            placeholderTextColor="#9CA3AF"
+            value={formData.mdcnLicenseNumber}
+            onChangeText={(text) => updateFormData("mdcnLicenseNumber", text)}
+            autoCapitalize="characters"
+          />
+        </View>
+        {errors.mdcnLicenseNumber && (
+          <Text className="text-red-500 text-xs mt-1 ml-1">
+            {errors.mdcnLicenseNumber}
+          </Text>
+        )}
+        <Text className="text-gray-500 text-xs mt-1 ml-1">
+          Medical & Dental Council of Nigeria registration number
+        </Text>
+      </View>
+
+      {/* Years of Experience */}
+      <View className="mb-4">
+        <Text className="text-sm font-semibold text-gray-700 mb-2">
+          Years of Experience <Text className="text-red-500">*</Text>
+        </Text>
+        <View
+          className={`border-2 rounded-xl px-4 py-3 ${
+            errors.yearsOfExperience ? "border-red-500" : "border-gray-200"
+          }`}
+        >
+          <TextInput
+            className="text-base text-gray-900"
+            placeholder="e.g., 5"
+            placeholderTextColor="#9CA3AF"
+            value={formData.yearsOfExperience}
+            onChangeText={(text) => updateFormData("yearsOfExperience", text)}
+            keyboardType="number-pad"
+          />
+        </View>
+        {errors.yearsOfExperience && (
+          <Text className="text-red-500 text-xs mt-1 ml-1">
+            {errors.yearsOfExperience}
+          </Text>
+        )}
+      </View>
+
+      {/* Specializations */}
+      <View className="mb-4">
+        <Text className="text-sm font-semibold text-gray-700 mb-2">
+          Specializations <Text className="text-red-500">*</Text>
+        </Text>
+        <View className="flex-row flex-wrap gap-2">
+          {DENTIST_SPECIALIZATIONS.map((spec) => {
+            const isSelected = selectedSpecializations.includes(spec);
+            const shortName = spec.replace(/_/g, " ");
+            return (
+              <TouchableOpacity
+                key={spec}
+                onPress={() => {
+                  if (isSelected) {
+                    setSelectedSpecializations(
+                      selectedSpecializations.filter((s) => s !== spec),
+                    );
+                  } else {
+                    setSelectedSpecializations([
+                      ...selectedSpecializations,
+                      spec,
+                    ]);
+                  }
+                }}
+                className={`px-3 py-2 rounded-lg border-2 ${
+                  isSelected
+                    ? "border-[#0a7ea4] bg-[#0a7ea4]/10"
+                    : "border-gray-200"
+                }`}
+              >
+                <Text
+                  className={`text-xs font-medium ${
+                    isSelected ? "text-[#0a7ea4]" : "text-gray-600"
+                  }`}
+                >
+                  {shortName}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        {errors.role && (
+          <Text className="text-red-500 text-xs mt-1 ml-1">{errors.role}</Text>
+        )}
+      </View>
+
+      {/* Bio (Optional) */}
+      <View className="mb-6">
+        <Text className="text-sm font-semibold text-gray-700 mb-2">
+          Bio <Text className="text-gray-400">(Optional)</Text>
+        </Text>
+        <View className="border-2 border-gray-200 rounded-xl px-4 py-3">
+          <TextInput
+            className="text-base text-gray-900 min-h-[80]"
+            placeholder="Tell patients about yourself..."
+            placeholderTextColor="#9CA3AF"
+            value={formData.bio}
+            onChangeText={(text) => updateFormData("bio", text)}
+            multiline
+            textAlignVertical="top"
+          />
+        </View>
+      </View>
+
+      {/* Action Buttons */}
+      <View className="gap-3">
+        <TouchableOpacity
+          onPress={handleDentistRegister}
+          disabled={loading}
+          activeOpacity={0.8}
+          className={`bg-[#0a7ea4] py-4 rounded-xl items-center shadow-lg ${
             loading ? "opacity-70" : ""
           }`}
         >
@@ -483,54 +791,41 @@ const RegisterScreen: React.FC = () => {
       >
         <View className="flex-1 px-6 pt-16 pb-8">
           {/* Header */}
-          <View className="mb-8">
+          <View className="mb-6">
             <TouchableOpacity
-              onPress={() => router.back()}
+              onPress={handleBack}
               className="w-10 h-10 items-center justify-center mb-4"
             >
               <Text className="text-2xl">←</Text>
             </TouchableOpacity>
-            <View className="w-16 h-16 bg-blue-600 rounded-2xl items-center justify-center mb-4">
-              <Text
-                className="text-white text-3xl font-bold"
-                onPress={() => router.push("/")}
-              >
-                🦷
-              </Text>
+            <View className="flex-row items-center gap-3 mb-2">
+              <View className="w-12 h-12 bg-[#0a7ea4] rounded-xl items-center justify-center">
+                <Text className="text-white text-xl font-bold">🦷</Text>
+              </View>
+              <View>
+                <Text className="text-2xl font-bold text-gray-900">
+                  Create Account
+                </Text>
+                <Text className="text-sm text-gray-500">
+                  {selectedRole === "DENTIST"
+                    ? "Register as a Dentist"
+                    : "Register as a Patient"}
+                </Text>
+              </View>
             </View>
-            <Text className="text-4xl font-extrabold text-gray-900 mb-2">
-              Create Account
-            </Text>
-            <Text className="text-base text-gray-600">
-              Join DentalCare and start your journey to better dental health
-            </Text>
           </View>
 
-          {/* Progress Indicator */}
-          <View className="flex-row mb-8">
-            <View
-              className={`flex-1 h-1 rounded-full mr-2 ${
-                currentStep >= 1 ? "bg-blue-600" : "bg-gray-200"
-              }`}
-            />
-            <View
-              className={`flex-1 h-1 rounded-full ${
-                currentStep >= 2 ? "bg-blue-600" : "bg-gray-200"
-              }`}
-            />
-          </View>
-
-          {/* Step Title */}
-          <Text className="text-lg font-bold text-gray-900 mb-6">
-            {currentStep === 1
-              ? "Step 1: Personal Information"
-              : "Step 2: Security & Profile"}
-          </Text>
+          {/* Step Indicator */}
+          {renderStepIndicator()}
 
           {/* Form Steps */}
-          {currentStep === 1 ? renderStep1() : renderStep2()}
+          {currentStep === 1 && renderStep1()}
+          {currentStep === 2 && renderStep2()}
+          {currentStep === 3 &&
+            selectedRole === "DENTIST" &&
+            renderDentistStep()}
 
-          {/* Sign In Link */}
+          {/* Login Link */}
           <View className="flex-row justify-center items-center mt-6">
             <Text className="text-gray-600 text-sm">
               Already have an account?{" "}
@@ -539,19 +834,19 @@ const RegisterScreen: React.FC = () => {
               onPress={() => router.push("/login")}
               activeOpacity={0.7}
             >
-              <Text className="text-blue-600 text-sm font-bold">Sign In</Text>
+              <Text className="text-[#0a7ea4] text-sm font-bold">Sign In</Text>
             </TouchableOpacity>
           </View>
 
           {/* Terms */}
-          <View className="items-center mt-6">
+          <View className="items-center mt-4">
             <Text className="text-gray-500 text-xs text-center leading-5">
-              By creating an account, you agree to our{" "}
-              <Text className="text-blue-600 font-semibold">
+              By continuing, you agree to our{" "}
+              <Text className="text-[#0a7ea4] font-semibold">
                 Terms of Service
               </Text>{" "}
               and{" "}
-              <Text className="text-blue-600 font-semibold">
+              <Text className="text-[#0a7ea4] font-semibold">
                 Privacy Policy
               </Text>
             </Text>
