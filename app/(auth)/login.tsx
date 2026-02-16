@@ -1,6 +1,11 @@
 // LoginScreen.tsx
+import { useLoginMutation } from "@/store/api/apiSlice";
+import { setAccessToken, setUser } from "@/store/authStorage";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { setCredentials, setError } from "@/store/slices/authSlice";
+import { decodeJWT } from "@/utils/jwt";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,27 +19,50 @@ import {
   View,
 } from "react-native";
 
-const LoginScreen: React.FC = () => {
+export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>(
     {},
   );
 
+  // Redux hooks
+  const dispatch = useAppDispatch();
+  const { user } = useAppSelector((state) => state.auth);
+  const [loginMutation, { isLoading }] = useLoginMutation();
+
+  // Redirect based on role after successful login
+  useEffect(() => {
+    console.log("role", user?.role);
+    if (user) {
+      switch (user.role) {
+        case "PATIENT":
+          router.replace("/(dashboard)/patient/(tabs)" as any);
+          break;
+        case "DENTIST":
+          router.replace("/(dashboard)/dentist/(tabs)" as any);
+          break;
+        case "ADMIN":
+        case "SUPPORT":
+          router.replace("/(dashboard)/admin/(tabs)" as any);
+          break;
+        default:
+          router.replace("/(dashboard)/(tabs)" as any);
+      }
+    }
+  }, [user, router]);
+
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
 
-    // Email validation
     if (!email.trim()) {
       newErrors.email = "Email is required";
     } else if (!/\S+@\S+\.\S+/.test(email)) {
       newErrors.email = "Please enter a valid email";
     }
 
-    // Password validation
     if (!password) {
       newErrors.password = "Password is required";
     } else if (password.length < 8) {
@@ -50,41 +78,45 @@ const LoginScreen: React.FC = () => {
       return;
     }
 
-    setLoading(true);
-
     try {
-      // API call to your NestJS backend
-      const response = await fetch("YOUR_API_URL/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
+      const result = await loginMutation({ email, password }).unwrap();
 
-      const data = await response.json();
+      // Decode JWT token to get user info
+      const payload = decodeJWT(result.accessToken);
 
-      if (!response.ok) {
-        throw new Error(data.message || "Invalid email or password");
+      if (!payload) {
+        throw new Error("Invalid token received");
       }
 
-      // Store tokens (implement your auth storage)
-      // await AsyncStorage.setItem("accessToken", data.accessToken);
-      // await AsyncStorage.setItem("refreshToken", data.refreshToken);
+      // Create user object from JWT payload
+      const user = {
+        id: payload.sub,
+        email: payload.email || email,
+        name: payload.name || email.split("@")[0],
+        role:
+          (payload.role as "PATIENT" | "DENTIST" | "ADMIN" | "SUPPORT") ||
+          "PATIENT",
+      };
 
-      // Navigate based on user role
-      if (data.user.role === "DENTIST") {
-        router.replace("/(dashboard)/(tabs)");
-      } else {
-        router.replace("/(dashboard)/(tabs)");
-      }
-    } catch (error: any) {
-      Alert.alert(
-        "Login Failed",
-        error.message || "Invalid email or password. Please try again.",
+      dispatch(
+        setCredentials({
+          user,
+          accessToken: result.accessToken,
+        }),
       );
-    } finally {
-      setLoading(false);
+
+      // Persist auth data to secure storage
+      await Promise.all([
+        setAccessToken(result.accessToken),
+        setUser(JSON.stringify(user)),
+      ]);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Login failed. Please try again.";
+      dispatch(setError(errorMessage));
+      Alert.alert("Login Failed", errorMessage);
     }
   };
 
@@ -100,11 +132,10 @@ const LoginScreen: React.FC = () => {
         keyboardShouldPersistTaps="handled"
       >
         <View className="flex-1 px-6 pt-16">
-          {/* Header */}
           <View className="mb-10">
             <TouchableOpacity
               onPress={() => router.push("/")}
-              className="w-14 h-14 bg-[#0a7ea4] rounded-2xl items-center justify-center mb-4"
+              className="w-14 h-14 bg-blue-600 rounded-2xl items-center justify-center mb-4"
             >
               <Text className="text-white text-3xl font-bold">🦷</Text>
             </TouchableOpacity>
@@ -116,9 +147,7 @@ const LoginScreen: React.FC = () => {
             </Text>
           </View>
 
-          {/* Login Form */}
           <View className="mb-6">
-            {/* Email Input */}
             <View className="mb-5">
               <Text className="text-sm font-semibold text-gray-700 mb-2">
                 Email Address
@@ -135,8 +164,9 @@ const LoginScreen: React.FC = () => {
                   value={email}
                   onChangeText={(text) => {
                     setEmail(text);
-                    if (errors.email)
+                    if (errors.email) {
                       setErrors({ ...errors, email: undefined });
+                    }
                   }}
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -150,7 +180,6 @@ const LoginScreen: React.FC = () => {
               )}
             </View>
 
-            {/* Password Input */}
             <View className="mb-3">
               <Text className="text-sm font-semibold text-gray-700 mb-2">
                 Password
@@ -167,8 +196,9 @@ const LoginScreen: React.FC = () => {
                   value={password}
                   onChangeText={(text) => {
                     setPassword(text);
-                    if (errors.password)
+                    if (errors.password) {
                       setErrors({ ...errors, password: undefined });
+                    }
                   }}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
@@ -178,7 +208,7 @@ const LoginScreen: React.FC = () => {
                   onPress={() => setShowPassword(!showPassword)}
                   activeOpacity={0.7}
                 >
-                  <Text className="text-[#0a7ea4] text-sm font-semibold">
+                  <Text className="text-blue-600 text-sm font-semibold">
                     {showPassword ? "Hide" : "Show"}
                   </Text>
                 </TouchableOpacity>
@@ -190,7 +220,6 @@ const LoginScreen: React.FC = () => {
               )}
             </View>
 
-            {/* Forgot Password */}
             <TouchableOpacity
               onPress={() =>
                 router.push({ pathname: "/forgot-password", params: { email } })
@@ -198,36 +227,33 @@ const LoginScreen: React.FC = () => {
               activeOpacity={0.7}
               className="self-end"
             >
-              <Text className="text-[#0a7ea4] text-sm font-semibold">
+              <Text className="text-blue-600 text-sm font-semibold">
                 Forgot Password?
               </Text>
             </TouchableOpacity>
           </View>
 
-          {/* Login Button */}
           <TouchableOpacity
             onPress={handleLogin}
-            disabled={loading}
+            disabled={isLoading}
             activeOpacity={0.8}
-            className={`bg-[#0a7ea4] py-4 rounded-xl items-center shadow-lg mb-6 ${
-              loading ? "opacity-70" : ""
+            className={`bg-blue-600 py-4 rounded-xl items-center shadow-lg mb-6 ${
+              isLoading ? "opacity-70" : ""
             }`}
           >
-            {loading ? (
+            {isLoading ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
               <Text className="text-white text-base font-bold">Sign In</Text>
             )}
           </TouchableOpacity>
 
-          {/* Divider */}
           <View className="flex-row items-center mb-6">
             <View className="flex-1 h-px bg-gray-300" />
             <Text className="text-gray-500 text-sm mx-4">OR</Text>
             <View className="flex-1 h-px bg-gray-300" />
           </View>
 
-          {/* Social Login Buttons */}
           <View className="mb-8">
             <TouchableOpacity
               activeOpacity={0.8}
@@ -250,7 +276,6 @@ const LoginScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Sign Up Link */}
           <View className="flex-row justify-center items-center mb-8">
             <Text className="text-gray-600 text-sm">
               Don't have an account?{" "}
@@ -259,19 +284,18 @@ const LoginScreen: React.FC = () => {
               onPress={() => router.push("/signup")}
               activeOpacity={0.7}
             >
-              <Text className="text-[#0a7ea4] text-sm font-bold">Sign Up</Text>
+              <Text className="text-blue-600 text-sm font-bold">Sign Up</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Terms & Privacy */}
           <View className="items-center pb-6">
             <Text className="text-gray-500 text-xs text-center leading-5">
               By continuing, you agree to our{" "}
-              <Text className="text-[#0a7ea4] font-semibold">
+              <Text className="text-blue-600 font-semibold">
                 Terms of Service
               </Text>{" "}
               and{" "}
-              <Text className="text-[#0a7ea4] font-semibold">
+              <Text className="text-blue-600 font-semibold">
                 Privacy Policy
               </Text>
             </Text>
@@ -280,6 +304,4 @@ const LoginScreen: React.FC = () => {
       </ScrollView>
     </KeyboardAvoidingView>
   );
-};
-
-export default LoginScreen;
+}

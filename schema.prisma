@@ -1,0 +1,819 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// USER MANAGEMENT
+// ============================================
+
+enum UserRole {
+  PATIENT
+  DENTIST
+  ADMIN
+  SUPPORT
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+  DEACTIVATED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+model User {
+  id                  String        @id @default(uuid())
+  email               String        @unique
+  phoneNumber         String        @unique
+  password            String
+  role                UserRole
+  accountStatus       AccountStatus @default(PENDING_VERIFICATION)
+  isEmailVerified     Boolean       @default(false)
+  isPhoneVerified     Boolean       @default(false)
+  emailVerifiedAt     DateTime?
+  phoneVerifiedAt     DateTime?
+  lastLoginAt         DateTime?
+  refreshToken        String?
+  passwordResetToken  String?
+  passwordResetExpiry DateTime?
+  emailVerificationToken String?
+  phoneVerificationToken String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  deletedAt           DateTime?
+
+  // Relationships
+  patient       Patient?
+  dentist       Dentist?
+  notifications Notification[]
+  activityLogs  ActivityLog[]
+
+  @@index([email])
+  @@index([phoneNumber])
+  @@index([role])
+}
+
+// ============================================
+// PATIENT MANAGEMENT
+// ============================================
+
+enum BloodGroup {
+  A_POSITIVE
+  A_NEGATIVE
+  B_POSITIVE
+  B_NEGATIVE
+  AB_POSITIVE
+  AB_NEGATIVE
+  O_POSITIVE
+  O_NEGATIVE
+  UNKNOWN
+}
+
+model Patient {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  firstName    String
+  lastName     String
+  middleName   String?
+  dateOfBirth  DateTime
+  gender       Gender
+  profilePhoto String?
+
+  // Contact & Location
+  address    String?
+  city       String?
+  state      String?
+  country    String  @default("Nigeria")
+  postalCode String?
+
+  // Emergency Contact
+  emergencyContactName     String?
+  emergencyContactPhone    String?
+  emergencyContactRelation String?
+
+  // Medical Information
+  bloodGroup         BloodGroup @default(UNKNOWN)
+  allergies          String[]   @default([])
+  chronicConditions  String[]   @default([])
+  currentMedications String[]   @default([])
+
+  // Insurance
+  hasInsurance          Boolean @default(false)
+  insuranceProvider     String?
+  insurancePolicyNumber String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  appointments   Appointment[]
+  medicalRecords MedicalRecord[]
+  reviews        Review[]
+  favorites      FavoriteDentist[]
+  prescriptions  Prescription[]
+  payments       Payment[]
+  familyMembers  FamilyMember[]
+
+  @@index([userId])
+  @@index([city, state])
+}
+
+model FamilyMember {
+  id        String  @id @default(uuid())
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  firstName    String
+  lastName     String
+  dateOfBirth  DateTime
+  gender       Gender
+  relationship String // son, daughter, spouse, parent, etc.
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+}
+
+// ============================================
+// DENTIST MANAGEMENT
+// ============================================
+
+enum DentistStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  SUSPENDED
+  REJECTED
+}
+
+enum DentistSpecialization {
+  GENERAL_DENTISTRY
+  ORTHODONTICS
+  PERIODONTICS
+  ENDODONTICS
+  PROSTHODONTICS
+  ORAL_SURGERY
+  PEDIATRIC_DENTISTRY
+  COSMETIC_DENTISTRY
+  IMPLANTOLOGY
+  ORAL_PATHOLOGY
+}
+
+model Dentist {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  firstName    String
+  lastName     String
+  profilePhoto String?
+  gender       Gender
+
+  // Professional Details
+  mdcnLicenseNumber      String                  @unique // Medical & Dental Council of Nigeria
+  mdcnVerificationStatus Boolean                 @default(false)
+  specializations        DentistSpecialization[]
+  yearsOfExperience      Int
+  qualifications         String[]                @default([])
+  bio                    String?
+
+  // Clinic Association
+  clinicId      String?
+  clinic        Clinic? @relation(fields: [clinicId], references: [id])
+  isClinicOwner Boolean @default(false)
+
+  // Availability & Pricing
+  consultationFee    Decimal  @db.Decimal(10, 2)
+  acceptsInsurance   Boolean  @default(false)
+  insuranceProviders String[] @default([])
+
+  // Ratings
+  averageRating Decimal @default(0) @db.Decimal(3, 2)
+  totalReviews  Int     @default(0)
+
+  status     DentistStatus @default(PENDING_VERIFICATION)
+  verifiedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  appointments   Appointment[]
+  availability   DentistAvailability[]
+  reviews        Review[]
+  favoritedBy    FavoriteDentist[]
+  services       DentistService[]
+  prescriptions  Prescription[]
+  certifications Certification[]
+
+  @@index([userId])
+  @@index([clinicId])
+  @@index([status])
+  @@index([mdcnLicenseNumber])
+}
+
+model Certification {
+  id        String  @id @default(uuid())
+  dentistId String
+  dentist   Dentist @relation(fields: [dentistId], references: [id], onDelete: Cascade)
+
+  certificateName String
+  issuingBody     String
+  issueDate       DateTime
+  expiryDate      DateTime?
+  certificateUrl  String // Document storage URL
+  isVerified      Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([dentistId])
+}
+
+// ============================================
+// CLINIC MANAGEMENT
+// ============================================
+
+enum ClinicStatus {
+  ACTIVE
+  PENDING_VERIFICATION
+  SUSPENDED
+  CLOSED
+}
+
+model Clinic {
+  id                 String  @id @default(uuid())
+  name               String
+  registrationNumber String  @unique
+  email              String
+  phoneNumber        String
+  whatsappNumber     String?
+
+  // Location
+  address   String
+  city      String
+  state     String
+  country   String   @default("Nigeria")
+  latitude  Decimal? @db.Decimal(10, 8)
+  longitude Decimal? @db.Decimal(11, 8)
+
+  // Details
+  description String?
+  photos      String[] @default([])
+  logo        String?
+
+  // Operational
+  openingTime String // Format: "08:00"
+  closingTime String // Format: "18:00"
+  workingDays String[] @default(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])
+
+  // Facilities
+  hasParking          Boolean  @default(false)
+  hasWheelchairAccess Boolean  @default(false)
+  hasEmergencyService Boolean  @default(false)
+  equipment           String[] @default([])
+
+  status     ClinicStatus @default(PENDING_VERIFICATION)
+  verifiedAt DateTime?
+
+  averageRating Decimal @default(0) @db.Decimal(3, 2)
+  totalReviews  Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  dentists       Dentist[]
+  appointments   Appointment[]
+  services       Service[]
+  reviews        Review[]
+  clinicServices ClinicService[]
+
+  @@index([city, state])
+  @@index([status])
+}
+
+// ============================================
+// SERVICES & PRICING
+// ============================================
+
+enum ServiceCategory {
+  PREVENTIVE
+  RESTORATIVE
+  COSMETIC
+  ORTHODONTIC
+  SURGICAL
+  EMERGENCY
+  PEDIATRIC
+}
+
+model Service {
+  id                String          @id @default(uuid())
+  name              String
+  description       String?
+  category          ServiceCategory
+  estimatedDuration Int // in minutes
+
+  // Pricing (can vary by clinic)
+  basePrice Decimal @db.Decimal(10, 2)
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  clinics         Clinic[]
+  clinicServices  ClinicService[]
+  dentistServices DentistService[]
+
+  @@index([category])
+}
+
+model ClinicService {
+  id        String  @id @default(uuid())
+  clinicId  String
+  clinic    Clinic  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  price       Decimal @db.Decimal(10, 2)
+  isAvailable Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clinicId, serviceId])
+  @@index([clinicId])
+}
+
+model DentistService {
+  id        String  @id @default(uuid())
+  dentistId String
+  dentist   Dentist @relation(fields: [dentistId], references: [id], onDelete: Cascade)
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  price Decimal @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([dentistId, serviceId])
+  @@index([dentistId])
+}
+
+// ============================================
+// APPOINTMENT MANAGEMENT
+// ============================================
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  RESCHEDULED
+}
+
+enum AppointmentType {
+  CONSULTATION
+  CHECKUP
+  TREATMENT
+  FOLLOW_UP
+  EMERGENCY
+}
+
+model Appointment {
+  id                String @id @default(uuid())
+  appointmentNumber String @unique @default(uuid())
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  dentistId String
+  dentist   Dentist @relation(fields: [dentistId], references: [id])
+
+  clinicId String
+  clinic   Clinic @relation(fields: [clinicId], references: [id])
+
+  appointmentDate DateTime
+  appointmentTime String // Format: "14:30"
+  duration        Int // in minutes
+
+  type   AppointmentType
+  status AppointmentStatus @default(PENDING)
+
+  // Details
+  chiefComplaint String? // What patient is complaining about
+  notes          String? // Additional notes from patient
+  dentistNotes   String? // Notes from dentist
+
+  // Cancellation/Rescheduling
+  cancelledAt        DateTime?
+  cancellationReason String?
+  cancelledBy        String? // user id who cancelled
+  rescheduledFrom    String? // previous appointment id
+
+  // Reminders
+  reminderSentAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  medicalRecord MedicalRecord?
+  payment       Payment?
+
+  @@index([patientId])
+  @@index([dentistId])
+  @@index([clinicId])
+  @@index([appointmentDate])
+  @@index([status])
+}
+
+// ============================================
+// DENTIST AVAILABILITY
+// ============================================
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+model DentistAvailability {
+  id        String  @id @default(uuid())
+  dentistId String
+  dentist   Dentist @relation(fields: [dentistId], references: [id], onDelete: Cascade)
+
+  dayOfWeek DayOfWeek
+  startTime String // Format: "09:00"
+  endTime   String // Format: "17:00"
+
+  isAvailable Boolean @default(true)
+
+  // Break times
+  breakStartTime String?
+  breakEndTime   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([dentistId, dayOfWeek])
+  @@index([dentistId])
+}
+
+model DentistLeave {
+  id        String @id @default(uuid())
+  dentistId String
+
+  startDate DateTime
+  endDate   DateTime
+  reason    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([dentistId])
+  @@index([startDate, endDate])
+}
+
+// ============================================
+// MEDICAL RECORDS
+// ============================================
+
+model MedicalRecord {
+  id String @id @default(uuid())
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  appointmentId String      @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+
+  // Diagnosis & Treatment
+  diagnosis String
+  treatment String
+  notes     String?
+
+  // Dental Chart (tooth-specific records)
+  teethAffected String[] @default([]) // tooth numbers
+
+  // Attachments (X-rays, scans, etc.)
+  attachments String[] @default([])
+
+  // Follow-up
+  requiresFollowUp Boolean   @default(false)
+  followUpDate     DateTime?
+  followUpNotes    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([appointmentId])
+}
+
+// ============================================
+// PRESCRIPTIONS
+// ============================================
+
+enum PrescriptionStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model Prescription {
+  id String @id @default(uuid())
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  dentistId String
+  dentist   Dentist @relation(fields: [dentistId], references: [id])
+
+  prescriptionNumber String @unique @default(uuid())
+
+  medications PrescriptionItem[]
+
+  notes  String?
+  status PrescriptionStatus @default(ACTIVE)
+
+  issuedAt  DateTime  @default(now())
+  expiresAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([dentistId])
+}
+
+model PrescriptionItem {
+  id             String       @id @default(uuid())
+  prescriptionId String
+  prescription   Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+
+  medicationName String
+  dosage         String // e.g., "500mg"
+  frequency      String // e.g., "Twice daily"
+  duration       String // e.g., "7 days"
+  instructions   String? // e.g., "Take after meals"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([prescriptionId])
+}
+
+// ============================================
+// REVIEWS & RATINGS
+// ============================================
+
+model Review {
+  id String @id @default(uuid())
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  dentistId String?
+  dentist   Dentist? @relation(fields: [dentistId], references: [id])
+
+  clinicId String?
+  clinic   Clinic? @relation(fields: [clinicId], references: [id])
+
+  rating  Int // 1-5
+  comment String?
+
+  // Specific ratings
+  professionalismRating Int?
+  punctualityRating     Int?
+  facilityRating        Int?
+  valueForMoneyRating   Int?
+
+  isVerified  Boolean @default(false) // verified if from actual appointment
+  isPublished Boolean @default(true)
+
+  response    String? // Dentist/Clinic response
+  respondedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([dentistId])
+  @@index([clinicId])
+  @@index([rating])
+}
+
+// ============================================
+// PAYMENT MANAGEMENT
+// ============================================
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CARD
+  BANK_TRANSFER
+  USSD
+  CASH
+  INSURANCE
+  MOBILE_MONEY
+}
+
+model Payment {
+  id               String @id @default(uuid())
+  paymentReference String @unique @default(uuid())
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  appointmentId String      @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+
+  amount   Decimal @db.Decimal(10, 2)
+  currency String  @default("NGN")
+
+  paymentMethod PaymentMethod
+  status        PaymentStatus @default(PENDING)
+
+  // Payment Gateway Details
+  gatewayReference String? // Paystack/Flutterwave reference
+  gatewayResponse  Json?
+
+  paidAt DateTime?
+
+  // Refund
+  refundedAmount Decimal?  @db.Decimal(10, 2)
+  refundedAt     DateTime?
+  refundReason   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([appointmentId])
+  @@index([status])
+  @@index([paymentReference])
+}
+
+// ============================================
+// FAVORITES
+// ============================================
+
+model FavoriteDentist {
+  id String @id @default(uuid())
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  dentistId String
+  dentist   Dentist @relation(fields: [dentistId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([patientId, dentistId])
+  @@index([patientId])
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+enum NotificationType {
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_REMINDER
+  APPOINTMENT_CANCELLED
+  APPOINTMENT_RESCHEDULED
+  PAYMENT_SUCCESSFUL
+  PAYMENT_FAILED
+  REVIEW_REQUEST
+  PRESCRIPTION_READY
+  GENERAL
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  PUSH
+}
+
+model Notification {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type    NotificationType
+  channel NotificationChannel
+
+  title   String
+  message String
+  data    Json? // Additional data
+
+  isRead Boolean   @default(false)
+  readAt DateTime?
+
+  sentAt    DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+}
+
+// ============================================
+// ACTIVITY LOGS (for audit trail)
+// ============================================
+
+model ActivityLog {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  action     String // e.g., "APPOINTMENT_CREATED", "PROFILE_UPDATED"
+  resource   String? // e.g., "Appointment", "User"
+  resourceId String?
+
+  ipAddress String?
+  userAgent String?
+  metadata  Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ============================================
+// SYSTEM CONFIGURATION
+// ============================================
+
+model SystemConfig {
+  id          String  @id @default(uuid())
+  key         String  @unique
+  value       Json
+  description String?
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@index([key])
+}
+
+// Examples of system config:
+// - appointment_cancellation_hours: 24
+// - appointment_booking_advance_days: 30
+// - platform_commission_percentage: 10
+// - sms_enabled: true
+// - email_enabled: true
+
+// ============================================
+// RATE LIMITING
+// ============================================
+
+model RateLimit {
+  id        String   @id @default(uuid())
+  key       String   // e.g., "global_rl:192.168.1.1"
+  type      String   // "global", "auth", "payment"
+  count     Int      @default(1)
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+
+  @@index([key, type])
+  @@index([expiresAt])
+}

@@ -10,7 +10,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 
 const ForgotPasswordScreen: React.FC = () => {
@@ -91,7 +91,7 @@ const ForgotPasswordScreen: React.FC = () => {
 
             {/* Success Icon */}
             <View className="items-center mb-8">
-              <View className="w-20 h-20 bg-green-100 rounded-full items-center justify-center mb-4">
+              <View className="w-20 h-20 bg-blue-100 rounded-full items-center justify-center mb-4">
                 <Text className="text-4xl">✉️</Text>
               </View>
               <Text className="text-2xl font-bold text-gray-900 mb-2 text-center">

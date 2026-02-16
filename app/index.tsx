@@ -1,12 +1,15 @@
-// LandingScreen.tsx
+import { clearAllAuthData } from "@/store/authStorage";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { logout } from "@/store/slices/authSlice";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
-    ScrollView,
-    StatusBar,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  ScrollView,
+  StatusBar,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 interface FeatureCardProps {
@@ -113,40 +116,56 @@ const StatCard: React.FC<StatCardProps> = ({ value, label, color }) => (
 
 const LandingScreen: React.FC = () => {
   const router = useRouter();
+  const dispatch = useAppDispatch();
+  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+
+  const handleSignOut = () => {
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign Out",
+        style: "destructive",
+        onPress: async () => {
+          dispatch(logout());
+          await clearAllAuthData();
+        },
+      },
+    ]);
+  };
 
   const features = [
     {
-      icon: "📅",
+      icon: "calendar",
       title: "Easy Booking",
       description: "Book appointments with verified dentists in seconds",
       bgColor: "bg-blue-100",
     },
     {
-      icon: "⭐",
+      icon: "shield-checkmark",
       title: "Verified Dentists",
       description: "All dentists are MDCN licensed and verified",
       bgColor: "bg-yellow-100",
     },
     {
-      icon: "🔒",
+      icon: "lock-closed",
       title: "Secure Payments",
       description: "Safe payments with Paystack integration",
-      bgColor: "bg-green-100",
+      bgColor: "bg-blue-100",
     },
     {
-      icon: "📍",
+      icon: "location",
       title: "Find Nearby",
       description: "Locate quality dental care close to you",
       bgColor: "bg-pink-100",
     },
     {
-      icon: "⚡",
+      icon: "flash",
       title: "Instant Confirmation",
       description: "Get immediate appointment confirmation",
       bgColor: "bg-purple-100",
     },
     {
-      icon: "👨‍👩‍👧‍👦",
+      icon: "people",
       title: "Family Accounts",
       description: "Manage dental care for your entire family",
       bgColor: "bg-indigo-100",
@@ -200,7 +219,7 @@ const LandingScreen: React.FC = () => {
 
   const stats = [
     { value: "500+", label: "Verified Dentists", color: "text-blue-600" },
-    { value: "10,000+", label: "Happy Patients", color: "text-green-600" },
+    { value: "10,000+", label: "Happy Patients", color: "text-blue-600" },
     { value: "15+", label: "Cities Covered", color: "text-orange-600" },
     { value: "4.8/5", label: "Average Rating", color: "text-purple-600" },
   ];
@@ -235,25 +254,65 @@ const LandingScreen: React.FC = () => {
 
             {/* CTA Buttons */}
             <View className="flex-row gap-3 mb-10">
-              <TouchableOpacity
-                className="bg-blue-600 px-7 py-3.5 rounded-xl shadow-lg active:scale-95"
-                onPress={() => router.push("/signup")}
-                activeOpacity={0.8}
-              >
-                <Text className="text-white text-base font-bold">
-                  Get Started
-                </Text>
-              </TouchableOpacity>
+              {isAuthenticated ? (
+                <>
+                  <TouchableOpacity
+                    className="bg-blue-600 px-7 py-3.5 rounded-xl shadow-lg active:scale-95"
+                    onPress={() => {
+                      // Navigate to appropriate dashboard based on role
+                      if (user?.role === "PATIENT") {
+                        router.replace("/(dashboard)/patient/(tabs)" as any);
+                      } else if (user?.role === "DENTIST") {
+                        router.replace("/(dashboard)/dentist/(tabs)" as any);
+                      } else if (
+                        user?.role === "ADMIN" ||
+                        user?.role === "SUPPORT"
+                      ) {
+                        router.replace("/(dashboard)/admin/(tabs)" as any);
+                      } else {
+                        router.replace("/(dashboard)/(tabs)" as any);
+                      }
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text className="text-white text-base font-bold">
+                      Go to Dashboard
+                    </Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                className="bg-white px-7 py-3.5 rounded-xl border-2 border-blue-600 active:scale-95"
-                onPress={() => router.push("/login")}
-                activeOpacity={0.8}
-              >
-                <Text className="text-blue-600 text-base font-bold">
-                  Sign In
-                </Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    className="bg-white px-7 py-3.5 rounded-xl border-2 border-red-500 active:scale-95"
+                    onPress={handleSignOut}
+                    activeOpacity={0.8}
+                  >
+                    <Text className="text-red-500 text-base font-bold">
+                      Sign Out
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    className="bg-blue-600 px-7 py-3.5 rounded-xl shadow-lg active:scale-95"
+                    onPress={() => router.push("/signup")}
+                    activeOpacity={0.8}
+                  >
+                    <Text className="text-white text-base font-bold">
+                      Get Started
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    className="bg-white px-7 py-3.5 rounded-xl border-2 border-blue-600 active:scale-95"
+                    onPress={() => router.push("/login")}
+                    activeOpacity={0.8}
+                  >
+                    <Text className="text-blue-600 text-base font-bold">
+                      Sign In
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
 
             {/* Hero Image Placeholder */}

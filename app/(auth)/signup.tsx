@@ -275,7 +275,7 @@ const RegisterScreen: React.FC = () => {
           <View key={step} className="items-center mx-1">
             <View
               className={`w-8 h-8 rounded-full items-center justify-center ${
-                currentStep >= step ? "bg-[#0a7ea4]" : "bg-gray-200"
+                currentStep >= step ? "bg-blue-600" : "bg-gray-200"
               }`}
             >
               <Text
@@ -289,7 +289,7 @@ const RegisterScreen: React.FC = () => {
             {step < totalSteps && (
               <View
                 className={`w-8 h-0.5 mt-[-16px] ${
-                  currentStep > step ? "bg-[#0a7ea4]" : "bg-gray-200"
+                  currentStep > step ? "bg-blue-600" : "bg-gray-200"
                 }`}
               />
             )}
@@ -316,7 +316,7 @@ const RegisterScreen: React.FC = () => {
               onPress={() => setSelectedRole(option.role as UserRole)}
               className={`flex-1 py-4 rounded-xl border-2 items-center ${
                 selectedRole === option.role
-                  ? "border-[#0a7ea4] bg-[#0a7ea4]/10"
+                  ? "border-blue-600 bg-blue-600/10"
                   : "border-gray-200"
               }`}
             >
@@ -324,7 +324,7 @@ const RegisterScreen: React.FC = () => {
               <Text
                 className={`text-sm font-semibold ${
                   selectedRole === option.role
-                    ? "text-[#0a7ea4]"
+                    ? "text-blue-600"
                     : "text-gray-700"
                 }`}
               >
@@ -449,7 +449,7 @@ const RegisterScreen: React.FC = () => {
       <TouchableOpacity
         onPress={handleNext}
         activeOpacity={0.8}
-        className="bg-[#0a7ea4] py-4 rounded-xl items-center shadow-lg mb-4"
+        className="bg-blue-600 py-4 rounded-xl items-center shadow-lg mb-4"
       >
         <Text className="text-white text-base font-bold">Continue</Text>
       </TouchableOpacity>
@@ -479,7 +479,7 @@ const RegisterScreen: React.FC = () => {
             autoCorrect={false}
           />
           <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-            <Text className="text-[#0a7ea4] text-sm font-semibold">
+            <Text className="text-blue-600 text-sm font-semibold">
               {showPassword ? "Hide" : "Show"}
             </Text>
           </TouchableOpacity>
@@ -517,7 +517,7 @@ const RegisterScreen: React.FC = () => {
           <TouchableOpacity
             onPress={() => setShowConfirmPassword(!showConfirmPassword)}
           >
-            <Text className="text-[#0a7ea4] text-sm font-semibold">
+            <Text className="text-blue-600 text-sm font-semibold">
               {showConfirmPassword ? "Hide" : "Show"}
             </Text>
           </TouchableOpacity>
@@ -541,15 +541,13 @@ const RegisterScreen: React.FC = () => {
               onPress={() => updateFormData("gender", gender)}
               className={`flex-1 py-3 rounded-xl border-2 items-center ${
                 formData.gender === gender
-                  ? "border-[#0a7ea4] bg-[#0a7ea4]/10"
+                  ? "border-blue-600 bg-blue-600/10"
                   : "border-gray-200"
               }`}
             >
               <Text
                 className={`text-sm font-semibold ${
-                  formData.gender === gender
-                    ? "text-[#0a7ea4]"
-                    : "text-gray-700"
+                  formData.gender === gender ? "text-blue-600" : "text-gray-700"
                 }`}
               >
                 {gender.charAt(0) + gender.slice(1).toLowerCase()}
@@ -599,7 +597,7 @@ const RegisterScreen: React.FC = () => {
           onPress={handleNext}
           disabled={loading}
           activeOpacity={0.8}
-          className={`bg-[#0a7ea4] py-4 rounded-xl items-center shadow-lg ${
+          className={`bg-blue-600 py-4 rounded-xl items-center shadow-lg ${
             loading ? "opacity-70" : ""
           }`}
         >
@@ -709,13 +707,13 @@ const RegisterScreen: React.FC = () => {
                 }}
                 className={`px-3 py-2 rounded-lg border-2 ${
                   isSelected
-                    ? "border-[#0a7ea4] bg-[#0a7ea4]/10"
+                    ? "border-blue-600 bg-blue-600/10"
                     : "border-gray-200"
                 }`}
               >
                 <Text
                   className={`text-xs font-medium ${
-                    isSelected ? "text-[#0a7ea4]" : "text-gray-600"
+                    isSelected ? "text-blue-600" : "text-gray-600"
                   }`}
                 >
                   {shortName}
@@ -753,7 +751,7 @@ const RegisterScreen: React.FC = () => {
           onPress={handleDentistRegister}
           disabled={loading}
           activeOpacity={0.8}
-          className={`bg-[#0a7ea4] py-4 rounded-xl items-center shadow-lg ${
+          className={`bg-blue-600 py-4 rounded-xl items-center shadow-lg ${
             loading ? "opacity-70" : ""
           }`}
         >
@@ -799,7 +797,7 @@ const RegisterScreen: React.FC = () => {
               <Text className="text-2xl">←</Text>
             </TouchableOpacity>
             <View className="flex-row items-center gap-3 mb-2">
-              <View className="w-12 h-12 bg-[#0a7ea4] rounded-xl items-center justify-center">
+              <View className="w-12 h-12 bg-blue-600 rounded-xl items-center justify-center">
                 <Text className="text-white text-xl font-bold">🦷</Text>
               </View>
               <View>
@@ -834,7 +832,7 @@ const RegisterScreen: React.FC = () => {
               onPress={() => router.push("/login")}
               activeOpacity={0.7}
             >
-              <Text className="text-[#0a7ea4] text-sm font-bold">Sign In</Text>
+              <Text className="text-blue-600 text-sm font-bold">Sign In</Text>
             </TouchableOpacity>
           </View>
 
@@ -842,11 +840,11 @@ const RegisterScreen: React.FC = () => {
           <View className="items-center mt-4">
             <Text className="text-gray-500 text-xs text-center leading-5">
               By continuing, you agree to our{" "}
-              <Text className="text-[#0a7ea4] font-semibold">
+              <Text className="text-blue-600 font-semibold">
                 Terms of Service
               </Text>{" "}
               and{" "}
-              <Text className="text-[#0a7ea4] font-semibold">
+              <Text className="text-blue-600 font-semibold">
                 Privacy Policy
               </Text>
             </Text>
