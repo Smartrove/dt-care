@@ -1,8 +1,10 @@
-// ForgotPasswordScreen.tsx
+import { useForgotPasswordMutation } from "@/store/api/apiSlice";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { ArrowLeft, KeyRound, Mail } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -17,9 +19,10 @@ const ForgotPasswordScreen: React.FC = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const [email, setEmail] = useState((params.email as string) || "");
-  const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<"email" | "success">("email");
   const [error, setError] = useState<string | null>(null);
+
+  const [forgotPassword, { isLoading }] = useForgotPasswordMutation();
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /\S+@\S+\.\S+/;
@@ -37,30 +40,15 @@ const ForgotPasswordScreen: React.FC = () => {
       return;
     }
 
-    setLoading(true);
     setError(null);
 
     try {
-      // API call to send password reset link
-      const response = await fetch("YOUR_API_URL/auth/forgot-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to send reset link");
-      }
-
+      await forgotPassword({ email }).unwrap();
       setStep("success");
-    } catch (error: any) {
-      setError(error.message || "Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
+    } catch (err: any) {
+      const errorMessage =
+        err?.data?.message || "Failed to send reset link. Please try again.";
+      Alert.alert("Error", errorMessage);
     }
   };
 
@@ -86,20 +74,20 @@ const ForgotPasswordScreen: React.FC = () => {
               onPress={() => router.back()}
               className="w-10 h-10 items-center justify-center mb-6"
             >
-              <Text className="text-2xl">←</Text>
+              <ArrowLeft size={24} color="#374151" />
             </TouchableOpacity>
 
             {/* Success Icon */}
             <View className="items-center mb-8">
               <View className="w-20 h-20 bg-blue-100 rounded-full items-center justify-center mb-4">
-                <Text className="text-4xl">✉️</Text>
+                <Mail size={40} color="#2563eb" />
               </View>
               <Text className="text-2xl font-bold text-gray-900 mb-2 text-center">
                 Check Your Email
               </Text>
               <Text className="text-base text-gray-600 text-center">
                 We've sent a password reset link to{"\n"}
-                <Text className="font-semibold text-[#0a7ea4]">{email}</Text>
+                <Text className="font-semibold text-blue-600">{email}</Text>
               </Text>
             </View>
 
@@ -116,7 +104,7 @@ const ForgotPasswordScreen: React.FC = () => {
             {/* Action Buttons */}
             <TouchableOpacity
               onPress={handleResendEmail}
-              className="bg-[#0a7ea4] py-4 rounded-xl items-center shadow-lg mb-4"
+              className="bg-blue-600 py-4 rounded-xl items-center shadow-lg mb-4"
             >
               <Text className="text-white text-base font-bold">
                 Resend Email
@@ -155,11 +143,11 @@ const ForgotPasswordScreen: React.FC = () => {
               onPress={() => router.back()}
               className="w-10 h-10 items-center justify-center mb-4"
             >
-              <Text className="text-2xl">←</Text>
+              <ArrowLeft size={24} color="#374151" />
             </TouchableOpacity>
             <View className="flex-row items-center gap-3 mb-2">
-              <View className="w-12 h-12 bg-[#0a7ea4] rounded-xl items-center justify-center">
-                <Text className="text-white text-xl font-bold">🔐</Text>
+              <View className="w-12 h-12 bg-blue-600 rounded-xl items-center justify-center">
+                <KeyRound size={24} color="#FFFFFF" />
               </View>
               <View>
                 <Text className="text-2xl font-bold text-gray-900">
@@ -212,13 +200,13 @@ const ForgotPasswordScreen: React.FC = () => {
           {/* Send Reset Link Button */}
           <TouchableOpacity
             onPress={handleSendResetLink}
-            disabled={loading}
+            disabled={isLoading}
             activeOpacity={0.8}
-            className={`bg-[#0a7ea4] py-4 rounded-xl items-center shadow-lg mb-6 ${
-              loading ? "opacity-70" : ""
+            className={`bg-blue-600 py-4 rounded-xl items-center shadow-lg mb-6 ${
+              isLoading ? "opacity-70" : ""
             }`}
           >
-            {loading ? (
+            {isLoading ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
               <Text className="text-white text-base font-bold">
@@ -236,7 +224,7 @@ const ForgotPasswordScreen: React.FC = () => {
               onPress={() => router.replace("/login")}
               activeOpacity={0.7}
             >
-              <Text className="text-[#0a7ea4] text-sm font-bold">Sign In</Text>
+              <Text className="text-blue-600 text-sm font-bold">Sign In</Text>
             </TouchableOpacity>
           </View>
 
@@ -244,7 +232,7 @@ const ForgotPasswordScreen: React.FC = () => {
           <View className="items-center mt-6">
             <Text className="text-gray-500 text-xs text-center leading-5">
               Need help?{" "}
-              <Text className="text-[#0a7ea4] font-semibold">
+              <Text className="text-blue-600 font-semibold">
                 Contact Support
               </Text>
             </Text>

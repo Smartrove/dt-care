@@ -1,5 +1,11 @@
-// VerifyOTPScreen.tsx
+
+import {
+  useResendOtpMutation,
+  useVerifyEmailMutation,
+  useVerifyPhoneMutation,
+} from "@/store/api/apiSlice";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { ArrowLeft, Shield } from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -14,19 +20,29 @@ import {
   View,
 } from "react-native";
 
+type VerificationType = "email" | "phone";
+
 const VerifyOTPScreen: React.FC = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
 
+  const [verifyEmail, { isLoading: isVerifyingEmail }] =
+    useVerifyEmailMutation();
+  const [verifyPhone, { isLoading: isVerifyingPhone }] =
+    useVerifyPhoneMutation();
+  const [resendOtp, { isLoading: isResending }] = useResendOtpMutation();
+
   const [otp, setOtp] = useState<string>("");
-  const [loading, setLoading] = useState(false);
-  const [resendLoading, setResendLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(60);
+  const [verificationType, setVerificationType] =
+    useState<VerificationType>("email");
 
   const otpInputs = useRef<(TextInput | null)[]>([]);
   const userId = params.userId as string;
   const email = params.email as string;
+
+  const loading = isVerifyingEmail || isVerifyingPhone || isResending;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -71,72 +87,58 @@ const VerifyOTPScreen: React.FC = () => {
       return;
     }
 
-    setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch("YOUR_API_URL/auth/verify-otp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId,
-          otp: code,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Invalid or expired OTP");
+      if (verificationType === "email") {
+        await verifyEmail({ userId, otp: code }).unwrap();
+        Alert.alert(
+          "Email Verified",
+          "Your email has been verified. Now verify your phone number.",
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                setVerificationType("phone");
+                setOtp("");
+                setCountdown(60);
+              },
+            },
+          ],
+        );
+      } else {
+        await verifyPhone({ userId, otp: code }).unwrap();
+        Alert.alert(
+          "Verification Successful",
+          "Your account has been fully verified. You can now sign in.",
+          [{ text: "OK", onPress: () => router.replace("/login") }],
+        );
       }
-
-      Alert.alert(
-        "Verification Successful",
-        "Your account has been verified. You can now sign in.",
-        [{ text: "OK", onPress: () => router.replace("/login") }],
-      );
-    } catch (error: any) {
-      setError(error.message || "Verification failed. Please try again.");
-    } finally {
-      setLoading(false);
+    } catch (err: any) {
+      setError(err?.data?.message || "Verification failed. Please try again.");
     }
   };
 
   const handleResendOTP = async () => {
     if (countdown > 0) return;
 
-    setResendLoading(true);
-
     try {
-      const response = await fetch("YOUR_API_URL/auth/resend-otp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ userId }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to resend OTP");
-      }
+      await resendOtp({
+        userId,
+        type: verificationType === "email" ? "EMAIL" : "PHONE",
+      }).unwrap();
 
       setOtp("");
       setCountdown(60);
       Alert.alert(
         "OTP Sent",
-        "A new verification code has been sent to your email and phone.",
+        `A new verification code has been sent to your ${verificationType}.`,
       );
-    } catch (error: any) {
+    } catch (err: any) {
       Alert.alert(
         "Error",
-        error.message || "Failed to resend OTP. Please try again.",
+        err?.data?.message || "Failed to resend OTP. Please try again.",
       );
-    } finally {
-      setResendLoading(false);
     }
   };
 
@@ -158,15 +160,15 @@ const VerifyOTPScreen: React.FC = () => {
               onPress={() => router.back()}
               className="w-10 h-10 items-center justify-center mb-4"
             >
-              <Text className="text-2xl">←</Text>
+              <ArrowLeft size={24} color="#374151" />
             </TouchableOpacity>
             <View className="flex-row items-center gap-3 mb-2">
-              <View className="w-12 h-12 bg-[#0a7ea4] rounded-xl items-center justify-center">
-                <Text className="text-white text-xl font-bold">🔐</Text>
+              <View className="w-12 h-12 bg-blue-600 rounded-xl items-center justify-center">
+                <Shield size={24} color="#FFFFFF" />
               </View>
               <View>
                 <Text className="text-2xl font-bold text-gray-900">
-                  Verify OTP
+                  Verify {verificationType === "email" ? "Email" : "Phone"}
                 </Text>
                 <Text className="text-sm text-gray-500">
                   Enter the verification code
@@ -179,7 +181,9 @@ const VerifyOTPScreen: React.FC = () => {
           <View className="bg-blue-50 rounded-xl p-4 mb-6">
             <Text className="text-sm text-gray-700 text-center">
               We've sent a 6-digit verification code to{"\n"}
-              <Text className="font-semibold text-[#0a7ea4]">{email}</Text>
+              <Text className="font-semibold text-blue-600">
+                {verificationType === "email" ? email : "your phone"}
+              </Text>
             </Text>
           </View>
 
@@ -199,7 +203,7 @@ const VerifyOTPScreen: React.FC = () => {
                     error
                       ? "border-red-500 bg-red-50"
                       : otp[index]
-                        ? "border-[#0a7ea4] bg-[#0a7ea4]/10"
+                        ? "border-blue-600 bg-blue-600/10"
                         : "border-gray-200"
                   }`}
                   maxLength={1}
@@ -223,7 +227,7 @@ const VerifyOTPScreen: React.FC = () => {
             onPress={() => handleVerifyOTP()}
             disabled={loading}
             activeOpacity={0.8}
-            className={`bg-[#0a7ea4] py-4 rounded-xl items-center shadow-lg mb-4 ${
+            className={`bg-blue-600 py-4 rounded-xl items-center shadow-lg mb-4 ${
               loading ? "opacity-70" : ""
             }`}
           >
@@ -244,11 +248,11 @@ const VerifyOTPScreen: React.FC = () => {
             ) : (
               <TouchableOpacity
                 onPress={handleResendOTP}
-                disabled={resendLoading}
+                disabled={loading}
                 activeOpacity={0.7}
               >
-                <Text className="text-[#0a7ea4] text-sm font-bold">
-                  {resendLoading ? "Sending..." : "Resend OTP"}
+                <Text className="text-blue-600 text-sm font-bold">
+                  {isResending ? "Sending..." : "Resend OTP"}
                 </Text>
               </TouchableOpacity>
             )}
@@ -261,7 +265,7 @@ const VerifyOTPScreen: React.FC = () => {
               onPress={() => router.replace("/login")}
               activeOpacity={0.7}
             >
-              <Text className="text-[#0a7ea4] text-sm font-bold">Sign In</Text>
+              <Text className="text-blue-600 text-sm font-bold">Sign In</Text>
             </TouchableOpacity>
           </View>
 

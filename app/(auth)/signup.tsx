@@ -246,13 +246,17 @@ const RegisterScreen: React.FC = () => {
         }).unwrap();
       }
 
-      // Store tokens
-      await setAccessToken(result.accessToken);
-      await setUser({
-        id: result.userId,
-        email: formData.email,
-        role: selectedRole as "PATIENT" | "DENTIST",
-      });
+      // Only store tokens if they exist in the response
+      if (result?.accessToken) {
+        await setAccessToken(result.accessToken);
+      }
+      if (result?.userId) {
+        await setUser({
+          id: result.userId,
+          email: formData.email,
+          role: selectedRole as "PATIENT" | "DENTIST",
+        });
+      }
 
       Alert.alert(
         "Success",
@@ -261,13 +265,12 @@ const RegisterScreen: React.FC = () => {
 
       router.push({
         pathname: "/verify-otp",
-        params: { userId: result.userId, email: formData.email },
+        params: { userId: result?.userId, email: formData.email },
       });
     } catch (error: any) {
-      Alert.alert(
-        "Registration Failed",
-        error?.data?.message || error.message || "Please try again later.",
-      );
+      const errorMessage =
+        error?.data?.message || error?.message || "Please try again later.";
+      Alert.alert("Registration Failed", errorMessage);
     }
   };
 

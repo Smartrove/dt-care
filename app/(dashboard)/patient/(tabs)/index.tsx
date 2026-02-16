@@ -1,4 +1,9 @@
+import {
+  useGetCurrentPatientQuery,
+  useGetPatientAppointmentsQuery,
+} from "@/store/api/apiSlice";
 import { useAppSelector } from "@/store/hooks";
+import { useRouter } from "expo-router";
 import {
   Calendar,
   Clock,
@@ -7,45 +12,82 @@ import {
   Pill,
   Search,
 } from "lucide-react-native";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function PatientHomeScreen() {
+  const router = useRouter();
   const { user } = useAppSelector((state) => state.auth);
 
-  const upcomingAppointments = [
+  // Fetch patient data
+  const { data: patient, isLoading: isPatientLoading } =
+    useGetCurrentPatientQuery();
+  const { data: appointments, isLoading: isAppointmentsLoading } =
+    useGetPatientAppointmentsQuery();
+
+  // Filter upcoming appointments (not cancelled/completed)
+  const upcomingAppointments =
+    appointments?.filter(
+      (apt) => apt.status === "PENDING" || apt.status === "CONFIRMED",
+    ) || [];
+
+  const quickActions = [
     {
       id: "1",
-      dentist: "Dr. Sarah Johnson",
-      date: "Feb 15, 2025",
-      time: "10:00 AM",
-      type: "Regular Checkup",
-      status: "CONFIRMED",
+      title: "Book Appointment",
+      icon: Calendar,
+      color: "#3b82f6",
+      action: () => router.push("/(dashboard)/patient/(tabs)/find-dentist"),
     },
     {
       id: "2",
-      dentist: "Dr. Michael Chen",
-      date: "Feb 22, 2025",
-      time: "2:30 PM",
-      type: "Teeth Cleaning",
-      status: "PENDING",
+      title: "Find Dentist",
+      icon: Search,
+      color: "#3b82f6",
+      action: () => router.push("/(dashboard)/patient/(tabs)/find-dentist"),
+    },
+    {
+      id: "3",
+      title: "Medical Records",
+      icon: FileText,
+      color: "#3b82f6",
+      action: () => router.push("/(dashboard)/patient/(tabs)/records"),
+    },
+    {
+      id: "4",
+      title: "Prescriptions",
+      icon: Pill,
+      color: "#3b82f6",
+      action: () => router.push("/(dashboard)/patient/(tabs)/records"),
     },
   ];
 
-  const quickActions = [
-    { id: "1", title: "Book Appointment", icon: Calendar, color: "#3b82f6" },
-    { id: "2", title: "Find Dentist", icon: Search, color: "#3b82f6" },
-    { id: "3", title: "Medical Records", icon: FileText, color: "#3b82f6" },
-    { id: "4", title: "Prescriptions", icon: Pill, color: "#3b82f6" },
-  ];
+  // Get user name from patient data or auth
+  const displayName = patient
+    ? `${patient.firstName} ${patient.lastName}`
+    : user?.name || "Patient";
+
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
 
   return (
     <ScrollView className="flex-1 bg-gray-50">
       {/* Header */}
       <View className="bg-blue-600 px-6 pt-12 pb-6 rounded-b-3xl">
         <Text className="text-white text-sm opacity-80">Welcome back,</Text>
-        <Text className="text-white text-2xl font-bold">
-          {user?.name || "Patient"}
-        </Text>
+        <Text className="text-white text-2xl font-bold">{displayName}</Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} className="px-6 py-6">
@@ -61,6 +103,7 @@ export default function PatientHomeScreen() {
                 key={action.id}
                 className="w-[48%] bg-white p-4 rounded-xl mb-4 items-center shadow-sm"
                 style={{ elevation: 2 }}
+                onPress={action.action}
               >
                 <View
                   className="w-12 h-12 rounded-full items-center justify-center mb-2"
@@ -81,13 +124,22 @@ export default function PatientHomeScreen() {
           <Text className="text-lg font-bold text-gray-900">
             Upcoming Appointments
           </Text>
-          <TouchableOpacity>
+          <TouchableOpacity
+            onPress={() =>
+              router.push("/(dashboard)/patient/(tabs)/appointments")
+            }
+          >
             <Text className="text-blue-600 font-medium">See All</Text>
           </TouchableOpacity>
         </View>
 
-        {upcomingAppointments.length > 0 ? (
-          upcomingAppointments.map((appointment) => (
+        {isAppointmentsLoading ? (
+          <View className="bg-white p-6 rounded-xl items-center">
+            <ActivityIndicator color="#3b82f6" />
+            <Text className="text-gray-600 mt-2">Loading appointments...</Text>
+          </View>
+        ) : upcomingAppointments.length > 0 ? (
+          upcomingAppointments.slice(0, 3).map((appointment) => (
             <TouchableOpacity
               key={appointment.id}
               className="bg-white p-4 rounded-xl mb-3 shadow-sm"
@@ -97,7 +149,7 @@ export default function PatientHomeScreen() {
                 <View>
                   <Text className="text-gray-500 text-xs">Dentist</Text>
                   <Text className="text-gray-900 font-semibold">
-                    {appointment.dentist}
+                    Dentist #{appointment.dentistId}
                   </Text>
                 </View>
                 <View
@@ -122,19 +174,19 @@ export default function PatientHomeScreen() {
                 <View className="flex-row items-center">
                   <Calendar size={12} color="#6B7280" />
                   <Text className="text-gray-600 text-xs ml-1">
-                    {appointment.date}
+                    {formatDate(appointment.appointmentDate)}
                   </Text>
                 </View>
                 <View className="flex-row items-center">
                   <Clock size={12} color="#6B7280" />
                   <Text className="text-gray-600 text-xs ml-1">
-                    {appointment.time}
+                    {appointment.startTime}
                   </Text>
                 </View>
               </View>
               <View className="mt-2 pt-2 border-t border-gray-100">
                 <Text className="text-gray-500 text-xs">
-                  {appointment.type}
+                  Clinic #{appointment.clinicId}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -143,7 +195,12 @@ export default function PatientHomeScreen() {
           <View className="bg-white p-6 rounded-xl items-center">
             <Calendar size={40} color="#9CA3AF" />
             <Text className="text-gray-600 mt-2">No upcoming appointments</Text>
-            <TouchableOpacity className="mt-4 bg-blue-600 px-6 py-2 rounded-lg">
+            <TouchableOpacity
+              className="mt-4 bg-blue-600 px-6 py-2 rounded-lg"
+              onPress={() =>
+                router.push("/(dashboard)/patient/(tabs)/find-dentist")
+              }
+            >
               <Text className="text-white font-medium">Book Now</Text>
             </TouchableOpacity>
           </View>

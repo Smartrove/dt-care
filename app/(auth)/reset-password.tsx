@@ -1,17 +1,18 @@
-// ResetPasswordScreen.tsx
+import { useResetPasswordMutation } from "@/store/api/apiSlice";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { ArrowLeft, KeyRound, Shield } from "lucide-react-native";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StatusBar,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StatusBar,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 const ResetPasswordScreen: React.FC = () => {
@@ -22,11 +23,12 @@ const ResetPasswordScreen: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{
     password?: string;
     confirmPassword?: string;
   }>({});
+
+  const [resetPassword, { isLoading }] = useResetPasswordMutation();
 
   const userId = params.userId as string;
   const resetToken = params.token as string;
@@ -58,26 +60,12 @@ const ResetPasswordScreen: React.FC = () => {
       return;
     }
 
-    setLoading(true);
-
     try {
-      const response = await fetch("YOUR_API_URL/auth/reset-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId,
-          resetToken,
-          password,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to reset password");
-      }
+      await resetPassword({
+        token: resetToken,
+        newPassword: password,
+        confirmPassword: confirmPassword,
+      }).unwrap();
 
       Alert.alert(
         "Password Reset Successful",
@@ -87,10 +75,8 @@ const ResetPasswordScreen: React.FC = () => {
     } catch (error: any) {
       Alert.alert(
         "Reset Failed",
-        error.message || "Something went wrong. Please try again.",
+        error?.data?.message || "Something went wrong. Please try again.",
       );
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -112,11 +98,11 @@ const ResetPasswordScreen: React.FC = () => {
               onPress={() => router.back()}
               className="w-10 h-10 items-center justify-center mb-4"
             >
-              <Text className="text-2xl">←</Text>
+              <ArrowLeft size={24} color="#374151" />
             </TouchableOpacity>
             <View className="flex-row items-center gap-3 mb-2">
-              <View className="w-12 h-12 bg-[#0a7ea4] rounded-xl items-center justify-center">
-                <Text className="text-white text-xl font-bold">🔐</Text>
+              <View className="w-12 h-12 bg-blue-600 rounded-xl items-center justify-center">
+                <KeyRound size={24} color="#FFFFFF" />
               </View>
               <View>
                 <Text className="text-2xl font-bold text-gray-900">
@@ -162,7 +148,7 @@ const ResetPasswordScreen: React.FC = () => {
                 autoCorrect={false}
               />
               <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                <Text className="text-[#0a7ea4] text-sm font-semibold">
+                <Text className="text-blue-600 text-sm font-semibold">
                   {showPassword ? "Hide" : "Show"}
                 </Text>
               </TouchableOpacity>
@@ -204,7 +190,7 @@ const ResetPasswordScreen: React.FC = () => {
               <TouchableOpacity
                 onPress={() => setShowConfirmPassword(!showConfirmPassword)}
               >
-                <Text className="text-[#0a7ea4] text-sm font-semibold">
+                <Text className="text-blue-600 text-sm font-semibold">
                   {showConfirmPassword ? "Hide" : "Show"}
                 </Text>
               </TouchableOpacity>
@@ -219,13 +205,13 @@ const ResetPasswordScreen: React.FC = () => {
           {/* Reset Password Button */}
           <TouchableOpacity
             onPress={handleResetPassword}
-            disabled={loading}
+            disabled={isLoading}
             activeOpacity={0.8}
-            className={`bg-[#0a7ea4] py-4 rounded-xl items-center shadow-lg mb-6 ${
-              loading ? "opacity-70" : ""
+            className={`bg-blue-600 py-4 rounded-xl items-center shadow-lg mb-6 ${
+              isLoading ? "opacity-70" : ""
             }`}
           >
-            {loading ? (
+            {isLoading ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
               <Text className="text-white text-base font-bold">
@@ -243,14 +229,14 @@ const ResetPasswordScreen: React.FC = () => {
               onPress={() => router.replace("/login")}
               activeOpacity={0.7}
             >
-              <Text className="text-[#0a7ea4] text-sm font-bold">Sign In</Text>
+              <Text className="text-blue-600 text-sm font-bold">Sign In</Text>
             </TouchableOpacity>
           </View>
 
           {/* Security Note */}
           <View className="items-center mt-6">
             <View className="flex-row items-center gap-2">
-              <Text className="text-gray-400 text-xs">🔒</Text>
+              <Shield size={14} color="#9CA3AF" />
               <Text className="text-gray-500 text-xs">
                 Your password is encrypted and secure
               </Text>
