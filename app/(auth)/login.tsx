@@ -1,10 +1,11 @@
-// LoginScreen.tsx
+import { GoogleIcon } from "@/components/icons/GoogleIcon";
 import { useLoginMutation } from "@/store/api/apiSlice";
 import { setAccessToken, setUser } from "@/store/authStorage";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { setCredentials, setError } from "@/store/slices/authSlice";
 import { decodeJWT } from "@/utils/jwt";
 import { useRouter } from "expo-router";
+import { Phone } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -35,7 +36,6 @@ export default function LoginScreen() {
 
   // Redirect based on role after successful login
   useEffect(() => {
-    console.log("role", user?.role);
     if (user) {
       switch (user.role) {
         case "PATIENT":
@@ -106,10 +106,7 @@ export default function LoginScreen() {
       );
 
       // Persist auth data to secure storage
-      await Promise.all([
-        setAccessToken(result.accessToken),
-        setUser(JSON.stringify(user)),
-      ]);
+      await Promise.all([setAccessToken(result.accessToken), setUser(user)]);
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error
@@ -259,8 +256,8 @@ export default function LoginScreen() {
               activeOpacity={0.8}
               className="border-2 border-gray-200 py-3.5 rounded-xl items-center flex-row justify-center mb-3"
             >
-              <Text className="text-xl mr-2">🔍</Text>
-              <Text className="text-gray-700 text-base font-semibold">
+              <GoogleIcon size={20} />
+              <Text className="text-gray-700 text-base font-semibold ml-2">
                 Continue with Google
               </Text>
             </TouchableOpacity>
@@ -269,8 +266,8 @@ export default function LoginScreen() {
               activeOpacity={0.8}
               className="border-2 border-gray-200 py-3.5 rounded-xl items-center flex-row justify-center"
             >
-              <Text className="text-xl mr-2">📱</Text>
-              <Text className="text-gray-700 text-base font-semibold">
+              <Phone size={20} color="#374151" />
+              <Text className="text-gray-700 text-base font-semibold ml-2">
                 Continue with Phone
               </Text>
             </TouchableOpacity>

@@ -1,5 +1,10 @@
-// RegisterScreen.tsx
+import {
+  useRegisterDentistMutation,
+  useRegisterPatientMutation,
+} from "@/store/api/apiSlice";
+import { setAccessToken, setUser } from "@/store/authStorage";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { ArrowLeft, Heart, Stethoscope, User } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -62,10 +67,13 @@ const DENTIST_SPECIALIZATIONS = [
 const RegisterScreen: React.FC = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const [registerPatient, { isLoading: isPatientLoading }] =
+    useRegisterPatientMutation();
+  const [registerDentist, { isLoading: isDentistLoading }] =
+    useRegisterDentistMutation();
 
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
-  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [selectedSpecializations, setSelectedSpecializations] = useState<
@@ -87,6 +95,7 @@ const RegisterScreen: React.FC = () => {
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
+  const loading = isPatientLoading || isDentistLoading;
 
   const updateFormData = (field: keyof FormData, value: string) => {
     setFormData({ ...formData, [field]: value });
@@ -208,62 +217,57 @@ const RegisterScreen: React.FC = () => {
   };
 
   const handleRegister = async () => {
-    setLoading(true);
-
     try {
-      const endpoint =
-        selectedRole === "DENTIST"
-          ? "auth/register/dentist"
-          : "auth/register/patient";
-
-      const payload: any = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        phoneNumber: formData.phoneNumber,
-        password: formData.password,
-        gender: formData.gender,
-        dateOfBirth: formData.dateOfBirth,
-      };
+      let result;
 
       if (selectedRole === "DENTIST") {
-        payload.mdcnLicenseNumber = formData.mdcnLicenseNumber;
-        payload.yearsOfExperience = parseInt(formData.yearsOfExperience);
-        payload.specializations = selectedSpecializations;
-        payload.bio = formData.bio;
+        result = await registerDentist({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phoneNumber: formData.phoneNumber,
+          password: formData.password,
+          gender: formData.gender as "MALE" | "FEMALE" | "OTHER",
+          dateOfBirth: formData.dateOfBirth,
+          mdcnLicenseNumber: formData.mdcnLicenseNumber,
+          yearsOfExperience: parseInt(formData.yearsOfExperience),
+          specializations: selectedSpecializations,
+          bio: formData.bio,
+        }).unwrap();
+      } else {
+        result = await registerPatient({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phoneNumber: formData.phoneNumber,
+          password: formData.password,
+          gender: formData.gender as "MALE" | "FEMALE" | "OTHER",
+          dateOfBirth: formData.dateOfBirth,
+        }).unwrap();
       }
 
-      // API call to your NestJS backend
-      const response = await fetch(`YOUR_API_URL/${endpoint}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Registration failed");
-      }
-
-      router.push({
-        pathname: "/verify-otp",
-        params: { userId: data.userId, email: formData.email },
+      // Store tokens
+      await setAccessToken(result.accessToken);
+      await setUser({
+        id: result.userId,
+        email: formData.email,
+        role: selectedRole as "PATIENT" | "DENTIST",
       });
 
       Alert.alert(
         "Success",
         "Account created! Please check your email and phone for verification codes.",
       );
+
+      router.push({
+        pathname: "/verify-otp",
+        params: { userId: result.userId, email: formData.email },
+      });
     } catch (error: any) {
       Alert.alert(
         "Registration Failed",
-        error.message || "Please try again later.",
+        error?.data?.message || error.message || "Please try again later.",
       );
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -308,8 +312,8 @@ const RegisterScreen: React.FC = () => {
         </Text>
         <View className="flex-row gap-3">
           {[
-            { role: "PATIENT", label: "Patient", icon: "🏥" },
-            { role: "DENTIST", label: "Dentist", icon: "👨‍⚕️" },
+            { role: "PATIENT", label: "Patient", icon: User },
+            { role: "DENTIST", label: "Dentist", icon: Stethoscope },
           ].map((option) => (
             <TouchableOpacity
               key={option.role}
@@ -320,9 +324,12 @@ const RegisterScreen: React.FC = () => {
                   : "border-gray-200"
               }`}
             >
-              <Text className="text-2xl mb-1">{option.icon}</Text>
+              <option.icon
+                size={28}
+                color={selectedRole === option.role ? "#3b82f6" : "#374151"}
+              />
               <Text
-                className={`text-sm font-semibold ${
+                className={`text-sm font-semibold mt-1 ${
                   selectedRole === option.role
                     ? "text-blue-600"
                     : "text-gray-700"
@@ -794,11 +801,11 @@ const RegisterScreen: React.FC = () => {
               onPress={handleBack}
               className="w-10 h-10 items-center justify-center mb-4"
             >
-              <Text className="text-2xl">←</Text>
+              <ArrowLeft size={24} color="#374151" />
             </TouchableOpacity>
             <View className="flex-row items-center gap-3 mb-2">
               <View className="w-12 h-12 bg-blue-600 rounded-xl items-center justify-center">
-                <Text className="text-white text-xl font-bold">🦷</Text>
+                <Heart size={24} color="#FFFFFF" />
               </View>
               <View>
                 <Text className="text-2xl font-bold text-gray-900">

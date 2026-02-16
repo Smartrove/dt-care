@@ -10,6 +10,9 @@ const TOKEN_KEYS = {
  * Store access token securely
  */
 export async function setAccessToken(token: string): Promise<void> {
+  if (!token || typeof token !== "string") {
+    throw new Error("Invalid access token provided");
+  }
   await SecureStore.setItemAsync(TOKEN_KEYS.ACCESS_TOKEN, token);
 }
 
@@ -31,6 +34,9 @@ export async function deleteAccessToken(): Promise<void> {
  * Store refresh token securely
  */
 export async function setRefreshToken(token: string): Promise<void> {
+  if (!token || typeof token !== "string") {
+    throw new Error("Invalid refresh token provided");
+  }
   await SecureStore.setItemAsync(TOKEN_KEYS.REFRESH_TOKEN, token);
 }
 
@@ -51,8 +57,12 @@ export async function deleteRefreshToken(): Promise<void> {
 /**
  * Store user data as JSON string
  */
-export async function setUser(user: string): Promise<void> {
-  await SecureStore.setItemAsync(TOKEN_KEYS.USER, user);
+export async function setUser(user: object): Promise<void> {
+  if (!user || typeof user !== "object") {
+    throw new Error("Invalid user data provided");
+  }
+  const userString = JSON.stringify(user);
+  await SecureStore.setItemAsync(TOKEN_KEYS.USER, userString);
 }
 
 /**
@@ -82,7 +92,7 @@ export async function clearAllAuthData(): Promise<void> {
 export async function setAuthData(
   accessToken: string,
   refreshToken: string,
-  user: string,
+  user: object,
 ): Promise<void> {
   await Promise.all([
     setAccessToken(accessToken),

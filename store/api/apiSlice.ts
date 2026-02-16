@@ -6,10 +6,35 @@ export interface LoginCredentials {
   password: string;
 }
 
-export interface RegisterData {
+export interface PatientRegisterData {
+  firstName: string;
+  lastName: string;
   email: string;
+  phoneNumber: string;
   password: string;
-  name: string;
+  gender: "MALE" | "FEMALE" | "OTHER";
+  dateOfBirth: string;
+}
+
+export interface DentistRegisterData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+  password: string;
+  gender: "MALE" | "FEMALE" | "OTHER";
+  dateOfBirth: string;
+  mdcnLicenseNumber: string;
+  yearsOfExperience: number;
+  specializations: string[];
+  bio?: string;
+}
+
+export interface RegisterResponse {
+  accessToken: string;
+  refreshToken: string;
+  userId: string;
+  message: string;
 }
 
 export interface User {
@@ -52,9 +77,16 @@ export const apiSlice = createApi({
         body: credentials,
       }),
     }),
-    register: builder.mutation<{ token: string; user: User }, RegisterData>({
+    registerPatient: builder.mutation<RegisterResponse, PatientRegisterData>({
       query: (userData) => ({
-        url: "/auth/register",
+        url: "/auth/register/patient",
+        method: "POST",
+        body: userData,
+      }),
+    }),
+    registerDentist: builder.mutation<RegisterResponse, DentistRegisterData>({
+      query: (userData) => ({
+        url: "/auth/register/dentist",
         method: "POST",
         body: userData,
       }),
@@ -76,7 +108,8 @@ export const apiSlice = createApi({
 
 export const {
   useLoginMutation,
-  useRegisterMutation,
+  useRegisterPatientMutation,
+  useRegisterDentistMutation,
   useGetCurrentUserQuery,
   useGetPostsQuery,
   useGetPostByIdQuery,
